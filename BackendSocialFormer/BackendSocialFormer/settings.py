@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'SocialApp.apps.SocialappConfig',
     'cloudinary',
     'rest_framework',
+    'oauth2_provider',
     'drf_yasg',
 ]
 
@@ -99,6 +100,12 @@ DATABASES = {
     }
 }
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'oauth2_provider.contrib.rest_framework.OAuth2Authentication',
+    ),
+}
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
@@ -143,3 +150,17 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'SocialApp.User'
+
+
+OAUTH2_PROVIDER = {
+    'OAUTH2_BACKEND_CLASS': 'oauth2_provider.oauth2_backends.JSONOAuthLibCore'
+}
+
+#AUTO SEND EMAIL
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'socialformerstudentou@gmail.com'
+EMAIL_HOST_PASSWORD = 'vwijskeygiruveoc'
+LOGIN_URL = '/admin/login/'
