@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.fields import SerializerMethodField
 from rest_framework_recursive.fields import RecursiveField
 
-from SocialApp.models import Former, User, Post, Image, Comment
+from SocialApp.models import Former, User, Post, Image, Comment, ReactionPost
 
 
 class FormerSerializer(serializers.ModelSerializer):
@@ -54,10 +54,19 @@ class PostSerializer(serializers.ModelSerializer):
         model = Post
         fields = ['id', 'user', 'title', 'content', 'image', 'on_comment']
 
+class ReactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReactionPost
+        fields = ['id', 'post', 'user', 'reaction_type']
+
 class CommentSerializer(serializers.ModelSerializer):
-    replies = RecursiveField(many=True, read_only=True)
     class Meta:
         model = Comment
-        fields = ['id', 'user', 'post', 'comment', 'parent_comment', 'created_at', 'replies']
+        fields = ['id', 'user', 'post', 'comment', 'parent_comment', 'created_at']
+
+class ReplyCommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ['id', 'user', 'post', 'comment', 'parent_comment', 'created_at']
 
 

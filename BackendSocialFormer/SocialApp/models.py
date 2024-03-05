@@ -58,6 +58,17 @@ class Post(BaseModel):
     def __str__(self):
         return f'{self.user.username}: {self.title}'
 
+class ReactionPost(BaseModel):
+    class React(models.TextChoices):
+        LIKE = 'LIKE', ('Like')
+        HAHA = 'HAHA', ('Haha')
+        HEART = 'HEART', ('Heart')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='reactions')
+    reaction_type = models.CharField(max_length=10, choices=React.choices)
+
+    class Meta:
+        unique_together = ('user', 'post')
 
 class Image(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='images')
