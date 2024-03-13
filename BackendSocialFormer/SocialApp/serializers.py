@@ -60,13 +60,12 @@ class ReactionSerializer(serializers.ModelSerializer):
         fields = ['id', 'post', 'user', 'reaction_type']
 
 class CommentSerializer(serializers.ModelSerializer):
+    have_replies = serializers.SerializerMethodField()
+    def get_have_replies(self, obj):
+        return Comment.objects.filter(parent_comment=obj).exists()
     class Meta:
         model = Comment
-        fields = ['id', 'user', 'post', 'comment', 'parent_comment', 'created_at']
+        fields = ['id', 'user', 'post', 'comment', 'parent_comment', 'have_replies', 'created_at']
 
-class ReplyCommentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Comment
-        fields = ['id', 'user', 'post', 'comment', 'parent_comment', 'created_at']
 
 

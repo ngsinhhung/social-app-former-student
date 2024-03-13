@@ -11,7 +11,7 @@ import cloudinary.uploader
 from SocialApp import perms
 from SocialApp.models import User, Post, Image, Comment, ReactionPost
 from SocialApp.serializers import FormerSerializer, LecturerSerializer, PostSerializer, CommentSerializer, \
-    ReplyCommentSerializer, ReactionSerializer
+    ReactionSerializer
 
 
 # Create your views here.
@@ -105,13 +105,14 @@ class AccountViewSet(viewsets.ViewSet):
             return Response({'Error': 'Error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class PostViewSet(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView, generics.UpdateAPIView, generics.DestroyAPIView):
+class PostViewSet(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView, generics.UpdateAPIView,
+                  generics.DestroyAPIView):
     queryset = Post.objects.all().order_by('-id')
     serializer_class = PostSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_permissions(self):
-        if self.action in ['update', 'partial_update', 'delete', 'on_comment']:
+        if self.action in ['update', 'partial_update', 'destroy', 'on_comment']:
             self.permission_classes = [perms.IsOwner]
         return super(PostViewSet, self).get_permissions()
 
@@ -137,7 +138,8 @@ class PostViewSet(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView
             for image in request.FILES.getlist('image'):
                 res = cloudinary.uploader.upload(image, folder='post_image/')
                 Image.objects.create(post=post, image=res['secure_url'])
-            return Response(data=PostSerializer(post, context={'request': request}).data, status=status.HTTP_201_CREATED)
+            return Response(data=PostSerializer(post, context={'request': request}).data,
+                            status=status.HTTP_201_CREATED)
         except Exception as e:
             print(f"Error: {str(e)}")
             return Response({'Error': 'Error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -159,7 +161,7 @@ class PostViewSet(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView
         try:
             user = request.user
             post = self.get_object()
-            if request.methods.__eq__('post'):
+            if request.methods.__eq__('POST'):
                 reacted, react = ReactionPost.objects.update_or_create(
                     post=post,
                     user=user,
@@ -171,30 +173,31 @@ class PostViewSet(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView
 
                 return Response(data=ReactionSerializer(reacted).data,
                                 status=status.HTTP_201_CREATED)
-            elif request.methods.__eq__('get'):
+            elif request.methods.__eq__('GET'):
                 react = ReactionPost.objects.filter(post=post)
                 return Response(data=ReactionSerializer(react, many=True).data,
                                 status=status.HTTP_200_OK)
-            elif request.methods.__eq__('delete'):
+            elif request.methods.__eq__('DELETE'):
                 react = ReactionPost.objects.filter(post=post, user=user)
                 react.delete()
                 return Response(status=status.HTTP_204_NO_CONTENT)
             else:
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+                return Response(status=status.HTTP_400_BpoAD_REQUEST)
         except Exception as e:
             print(f"Error: {str(e)}")
             return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    @action(methods=['post', 'get'], detail=True, url_path='comment')
-    def comment_post(self, request):
+    @action(methods=["post", "get"], detail=True, url_path='comment')
+    def comment_post(self, request, pk):
         try:
             user = request.user
             post = self.get_object()
-            if request.method.__eq__('get'):
+            print(user)
+            if request.method.__eq__("GET"):
                 comment = Comment.objects.filter(Q(post=post) & Q(parent_comment__isnull=True))
                 return Response(data=CommentSerializer(comment, many=True, context={'request': request}).data,
                                 status=status.HTTP_200_OK)
-            elif request.method.__eq__('post'):
+            elif request.method.__eq__("POST"):
                 comment = Comment.objects.create(
                     user=user,
                     post=self.get_object(),
@@ -235,12 +238,15 @@ class CommentViewSet(viewsets.ViewSet, generics.UpdateAPIView, generics.DestroyA
             self.permission_classes = [perms.IsOwner]
         return super(CommentViewSet, self).get_permissions()
 
-
-    def update(self, request, pk):
+    def partial_update(self, request, pk):
         try:
-            comment = self.get_object()
-            comment.comment = request.data.get('comment')
-            comment.save()
+            user = request.user
+            comment = Comment.objects.get(pk=pk)
+            if user == comment.user:
+                comment.comment = request.data.get('comment')
+                comment.save()
+            else:
+                return Response(status=status.HTTP_403_FORBIDDEN)
             return Response(data=CommentSerializer(comment, context={'request': request}).data,
                             status=status.HTTP_200_OK)
         except Exception as e:
@@ -260,24 +266,21 @@ class CommentViewSet(viewsets.ViewSet, generics.UpdateAPIView, generics.DestroyA
     def reply(self, request, pk):
         try:
             user = request.user
-            parent = self.get_objects()
+            parent = Comment.objects.get(pk=pk)
             post = parent.post
-            if request.methods.__eq__('post'):
-                reply = Comment.objects.filter(
+            if request.method.__eq__('POST'):
+                reply = Comment.objects.create(
                     user=user,
                     post=post,
                     comment=request.data.get('comment'),
-                    parent=parent
+                    parent_comment=parent
                 )
-                return Response(data=CommentSerializer(reply).data, status=status)
-            elif request.methods.__eq__('get'):
+                return Response(data=CommentSerializer(reply).data, status=status.HTTP_201_CREATED)
+            elif request.method.__eq__('GET'):
                 reply = Comment.objects.filter(parent_comment=parent)
-                return Response(data=ReplyCommentSerializer(reply, many=True).data, status=status)
+                return Response(data=CommentSerializer(reply, many=True).data, status=status.HTTP_200_OK)
             else:
                 return Response(status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             print(f"Error: {str(e)}")
             return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-
