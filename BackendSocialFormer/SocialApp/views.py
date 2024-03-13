@@ -1,14 +1,20 @@
 import random
 
+from django.core.cache import cache
+from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import render
 from django.templatetags.static import static
-from rest_framework import viewsets, status, generics, parsers
+from rest_framework import viewsets, status, generics, parsers, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 import cloudinary.uploader
+from SocialApp.ultis import *
 
-from SocialApp.models import User
-from SocialApp.serializers import FormerSerializer, LecturerSerializer
+from SocialApp import perms
+from SocialApp.models import User, Post, Image, Comment, ReactionPost
+from SocialApp.serializers import FormerSerializer, LecturerSerializer, PostSerializer, CommentSerializer, \
+    ReactionSerializer
 
 
 # Create your views here.
@@ -101,14 +107,252 @@ class AccountViewSet(viewsets.ViewSet):
             print(f"Error: {str(e)}")
             return Response({'Error': 'Error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-    @action(methods=['post'], detail=False, url_path='sent-otp')
-    def sent_otp(self, request):
+    @action(methods=['post'], detail=False, url_path='reset-password')
+    def reset_password(self, request):
         try:
             email = request.data.get('email')
-            if email and User.objects.filter(email=email).exists():
-                otp = random.randint(1000,9999)
-                
+            new_password = request.data.get('new_password')
+            if email and new_password:
+                user = User.objects.filter(email=email).first()
+                user.set_password(new_password)
+                user.save()
+                return Response({"Password reset successfully"}, status=status.HTTP_200_OK)
+            else:
+                return Response({"Email and new password are required"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             print(f"Error: {str(e)}")
-            return Response({'Error': 'Error creating user'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+    @action(methods=['post'], detail=False, url_path='check-account')
+    def check_account(self, request):
+        try:
+            user = request.date.get('username')
+            email = request.data.get('email')
+            if email and user:
+                if user == User.objects.filter(username=user).first():
+                    return JsonResponse({'message': 'username is already exists', 'code': '01'})
+                if email == User.objects.filter(email=email).first():
+                    return JsonResponse({'message': 'email is already exists', 'code': '02'})
+                return JsonResponse({'message': 'Information is invalid', 'code': '00'})
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(methods=['post'], detail=False, url_path='register/sent-otp')
+    def sent_otp_new_account(self, request):
+        try:
+            user = request.data.get('username')
+            email = request.data.get('email')
+            if email and user:
+                otp = random.randint(1000, 9999)
+                cache.set(email, str(otp), timeout=60*5)
+                sent_otp(receiver=email, otp=otp, username=user)
+                return Response({}, status=status.HTTP_200_OK)
+            else:
+                return Response({"Email and username are required"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(methods=['post'], detail=False, url_path='verify-email')
+    def verify_email(self, request):
+        try:
+            if request.date.get('email') and request.date.get('otp'):
+                email = request.data.get('email')
+                otp = request.data.get('otp')
+                cache_otp = cache.get(email)
+                if cache_otp:
+                    if cache_otp == otp:
+                        return Response({"Email is valid"}, status=status.HTTP_200_OK)
+                    else:
+                        return Response({"Email is invalid"}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response({"OTP is timeout"}, status=status.HTTP_204_NO_CONTENT)
+            else:
+                return Response({"Email and OTP are required"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+class PostViewSet(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView, generics.UpdateAPIView,
+                  generics.DestroyAPIView):
+    queryset = Post.objects.all().order_by('-id')
+    serializer_class = PostSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['update', 'partial_update', 'destroy', 'on_comment']:
+            self.permission_classes = [perms.IsOwner]
+        return super(PostViewSet, self).get_permissions()
+
+    def list(self, request):
+        try:
+            user = request.user
+            posts = Post.objects.filter(user=user).order_by('-id')
+            return Response(data=PostSerializer(posts, many=True, context={'request': request}).data,
+                            status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def create(self, request):
+        try:
+            user = request.user
+            data = request.data
+            post = Post.objects.create(
+                user=user,
+                title=data['title'],
+                content=data['content']
+            )
+            for image in request.FILES.getlist('image'):
+                res = cloudinary.uploader.upload(image, folder='post_image/')
+                Image.objects.create(post=post, image=res['secure_url'])
+            return Response(data=PostSerializer(post, context={'request': request}).data,
+                            status=status.HTTP_201_CREATED)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return Response({'Error': 'Error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def update(self, request, pk):
+        try:
+            post = self.get_object()
+            for key, value in request.data.items():
+                setattr(post, key, value)
+            post.save()
+            return Response(data=PostSerializer(post, context={'request': request}).data,
+                            status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(methods=['post', 'get', 'delete'], detail=True, url_path='reaction')
+    def react_to_post(self, request, pk):
+        try:
+            user = request.user
+            post = self.get_object()
+            if request.methods.__eq__('POST'):
+                reacted, react = ReactionPost.objects.update_or_create(
+                    post=post,
+                    user=user,
+                    reaction_type=request.data.get('reaction_type')
+                )
+                if reacted:
+                    reacted.reaction_type = request.data.get('reaction_type')
+                    reacted.save()
+
+                return Response(data=ReactionSerializer(reacted).data,
+                                status=status.HTTP_201_CREATED)
+            elif request.methods.__eq__('GET'):
+                react = ReactionPost.objects.filter(post=post)
+                return Response(data=ReactionSerializer(react, many=True).data,
+                                status=status.HTTP_200_OK)
+            elif request.methods.__eq__('DELETE'):
+                react = ReactionPost.objects.filter(post=post, user=user)
+                react.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            else:
+                return Response(status=status.HTTP_400_BpoAD_REQUEST)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(methods=["post", "get"], detail=True, url_path='comment')
+    def comment_post(self, request, pk):
+        try:
+            user = request.user
+            post = self.get_object()
+            print(user)
+            if request.method.__eq__("GET"):
+                comment = Comment.objects.filter(Q(post=post) & Q(parent_comment__isnull=True))
+                return Response(data=CommentSerializer(comment, many=True, context={'request': request}).data,
+                                status=status.HTTP_200_OK)
+            elif request.method.__eq__("POST"):
+                comment = Comment.objects.create(
+                    user=user,
+                    post=self.get_object(),
+                    comment=request.data.get('comment')
+                )
+                return Response(data=CommentSerializer(comment, context={'request': request}).data,
+                                status=status.HTTP_201_CREATED)
+            else:
+                return Response({}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(methods=['put'], detail=True, url_path='on_comment')
+    def on_comment(self, request, pk):
+        try:
+            post = self.get_object()
+            if post.on_comment == True:
+                post.on_comment = False
+                post.save()
+            else:
+                post.on_comment = True
+                post.save()
+            return Response(data=PostSerializer(post, context={'request': request}).data,
+                            status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CommentViewSet(viewsets.ViewSet, generics.UpdateAPIView, generics.DestroyAPIView):
+    queryset = Comment.objects.filter(parent_comment__isnull=True)
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            self.permission_classes = [perms.IsOwner]
+        return super(CommentViewSet, self).get_permissions()
+
+    def partial_update(self, request, pk):
+        try:
+            user = request.user
+            comment = Comment.objects.get(pk=pk)
+            if user == comment.user:
+                comment.comment = request.data.get('comment')
+                comment.save()
+            else:
+                return Response(status=status.HTTP_403_FORBIDDEN)
+            return Response(data=CommentSerializer(comment, context={'request': request}).data,
+                            status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def destroy(self, request, pk):
+        try:
+            comment = self.get_object()
+            comment.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(methods=['post', 'get'], detail=True, url_path='reply')
+    def reply(self, request, pk):
+        try:
+            user = request.user
+            parent = Comment.objects.get(pk=pk)
+            post = parent.post
+            if request.method.__eq__('POST'):
+                reply = Comment.objects.create(
+                    user=user,
+                    post=post,
+                    comment=request.data.get('comment'),
+                    parent_comment=parent
+                )
+                return Response(data=CommentSerializer(reply).data, status=status.HTTP_201_CREATED)
+            elif request.method.__eq__('GET'):
+                reply = Comment.objects.filter(parent_comment=parent)
+                return Response(data=CommentSerializer(reply, many=True).data, status=status.HTTP_200_OK)
+            else:
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

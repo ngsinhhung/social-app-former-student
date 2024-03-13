@@ -53,6 +53,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'oauth2_provider',
     'drf_yasg',
+    'django_celery_results',
+    'debug_toolbar',
 ]
 
 MIDDLEWARE = [
@@ -63,6 +65,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
 
 ROOT_URLCONF = 'BackendSocialFormer.urls'
@@ -106,6 +109,7 @@ REST_FRAMEWORK = {
     ),
 }
 
+INTERNAL_IPS = ['127.0.0.1']
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
@@ -158,9 +162,12 @@ OAUTH2_PROVIDER = {
 
 #AUTO SEND EMAIL
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_HOST = 'live.smtp.mailtrap.io'
 EMAIL_PORT = 587
+EMAIL_HOST_USER = 'api'
+EMAIL_HOST_PASSWORD = '1cd1f806ac54f6a642f5467f2050f5f2'
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'socialformerstudentou@gmail.com'
-EMAIL_HOST_PASSWORD = 'vwijskeygiruveoc'
+EMAIL_USE_SSL = False
+
 LOGIN_URL = '/admin/login/'
+
