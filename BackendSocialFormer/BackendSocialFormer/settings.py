@@ -162,14 +162,12 @@ OAUTH2_PROVIDER = {
 
 #AUTO SEND EMAIL
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_HOST = 'live.smtp.mailtrap.io'
 EMAIL_PORT = 587
+EMAIL_HOST_USER = 'api'
+EMAIL_HOST_PASSWORD = '1cd1f806ac54f6a642f5467f2050f5f2'
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'socialformerstudentou@gmail.com'
-EMAIL_HOST_PASSWORD = 'vwijskeygiruveoc'
+EMAIL_USE_SSL = False
 
 LOGIN_URL = '/admin/login/'
 
-# #CELERY
-# CELERY_BROKER_URL = 'redis://localhost:6379/0'
-# CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'

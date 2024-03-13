@@ -1,12 +1,15 @@
 import random
 
+from django.core.cache import cache
 from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import render
 from django.templatetags.static import static
 from rest_framework import viewsets, status, generics, parsers, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 import cloudinary.uploader
+from SocialApp.ultis import *
 
 from SocialApp import perms
 from SocialApp.models import User, Post, Image, Comment, ReactionPost
@@ -103,6 +106,75 @@ class AccountViewSet(viewsets.ViewSet):
         except Exception as e:
             print(f"Error: {str(e)}")
             return Response({'Error': 'Error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(methods=['post'], detail=False, url_path='reset-password')
+    def reset_password(self, request):
+        try:
+            email = request.data.get('email')
+            new_password = request.data.get('new_password')
+            if email and new_password:
+                user = User.objects.filter(email=email).first()
+                user.set_password(new_password)
+                user.save()
+                return Response({"Password reset successfully"}, status=status.HTTP_200_OK)
+            else:
+                return Response({"Email and new password are required"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+    @action(methods=['post'], detail=False, url_path='check-account')
+    def check_account(self, request):
+        try:
+            user = request.date.get('username')
+            email = request.data.get('email')
+            if email and user:
+                if user == User.objects.filter(username=user).first():
+                    return JsonResponse({'message': 'username is already exists', 'code': '01'})
+                if email == User.objects.filter(email=email).first():
+                    return JsonResponse({'message': 'email is already exists', 'code': '02'})
+                return JsonResponse({'message': 'Information is invalid', 'code': '00'})
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(methods=['post'], detail=False, url_path='register/sent-otp')
+    def sent_otp_new_account(self, request):
+        try:
+            user = request.data.get('username')
+            email = request.data.get('email')
+            if email and user:
+                otp = random.randint(1000, 9999)
+                cache.set(email, str(otp), timeout=60*5)
+                sent_otp(receiver=email, otp=otp, username=user)
+                return Response({}, status=status.HTTP_200_OK)
+            else:
+                return Response({"Email and username are required"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(methods=['post'], detail=False, url_path='verify-email')
+    def verify_email(self, request):
+        try:
+            if request.date.get('email') and request.date.get('otp'):
+                email = request.data.get('email')
+                otp = request.data.get('otp')
+                cache_otp = cache.get(email)
+                if cache_otp:
+                    if cache_otp == otp:
+                        return Response({"Email is valid"}, status=status.HTTP_200_OK)
+                    else:
+                        return Response({"Email is invalid"}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response({"OTP is timeout"}, status=status.HTTP_204_NO_CONTENT)
+            else:
+                return Response({"Email and OTP are required"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 class PostViewSet(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView, generics.UpdateAPIView,
