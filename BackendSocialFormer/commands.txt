@@ -1,0 +1,2 @@
+#CELERY start
+celery -A BackendSocialFormer worker -l info --pool=solo

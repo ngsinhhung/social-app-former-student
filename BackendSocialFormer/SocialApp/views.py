@@ -9,8 +9,9 @@ from rest_framework import viewsets, status, generics, parsers, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 import cloudinary.uploader
-from SocialApp.ultis import *
 
+from BackendSocialFormer.celery import send_otp
+# from .utils import *
 from SocialApp import perms
 from SocialApp.models import User, Post, Image, Comment, ReactionPost
 from SocialApp.serializers import FormerSerializer, LecturerSerializer, PostSerializer, CommentSerializer, \
@@ -123,7 +124,6 @@ class AccountViewSet(viewsets.ViewSet):
             print(f"Error: {str(e)}")
             return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
     @action(methods=['post'], detail=False, url_path='check-account')
     def check_account(self, request):
         try:
@@ -147,7 +147,7 @@ class AccountViewSet(viewsets.ViewSet):
             if email and user:
                 otp = random.randint(1000, 9999)
                 cache.set(email, str(otp), timeout=60*5)
-                sent_otp(receiver=email, otp=otp, username=user)
+                send_otp.delay(receiver=email, otp=otp, username=user)
                 return Response({}, status=status.HTTP_200_OK)
             else:
                 return Response({"Email and username are required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -174,6 +174,7 @@ class AccountViewSet(viewsets.ViewSet):
         except Exception as e:
             print(f"Error: {str(e)}")
             return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 

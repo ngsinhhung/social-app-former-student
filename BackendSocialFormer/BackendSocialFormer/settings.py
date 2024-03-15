@@ -135,7 +135,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Ho_Chi_Minh'
 
 USE_I18N = True
 
@@ -162,12 +162,17 @@ OAUTH2_PROVIDER = {
 
 #AUTO SEND EMAIL
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'live.smtp.mailtrap.io'
+EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
-EMAIL_HOST_USER = 'api'
-EMAIL_HOST_PASSWORD = '1cd1f806ac54f6a642f5467f2050f5f2'
+EMAIL_HOST_USER = 'clintonfranklin120@gmail.com'
+EMAIL_HOST_PASSWORD = 'vtvigdhoyuibflaj'
 EMAIL_USE_TLS = True
-EMAIL_USE_SSL = False
+# EMAIL_USE_SSL = False
 
 LOGIN_URL = '/admin/login/'
 
+#CELERY SETTING
+CELERY_BROKER_URL = "amqp://guest:guest@localhost:5672//"
+# CELERY_BROKER_URL = 'redis://redis:6379/0'
+CELERY_TIMEZONE = "Asia/Ho_Chi_Minh"
+CELERY_TASK_TRACK_STARTED = True
