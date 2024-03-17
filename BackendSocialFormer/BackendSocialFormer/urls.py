@@ -24,9 +24,9 @@ from drf_yasg import openapi
 
 schema_view = get_schema_view(
 openapi.Info(
-    title="System Accommodation",
+    title="Model Alumni Social Network",
     default_version='v1',
-    description="APIs Backend System Accommodation",
+    description="APIs Backend",
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
