@@ -158,7 +158,7 @@ class AccountViewSet(viewsets.ViewSet):
     @action(methods=['post'], detail=False, url_path='verify-email')
     def verify_email(self, request):
         try:
-            if request.date.get('email') and request.date.get('otp'):
+            if request.data.get('email') and request.data.get('otp'):
                 email = request.data.get('email')
                 otp = request.data.get('otp')
                 cache_otp = cache.get(email)
@@ -255,7 +255,7 @@ class PostViewSet(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView
                 react.delete()
                 return Response(status=status.HTTP_204_NO_CONTENT)
             else:
-                return Response(status=status.HTTP_400_BpoAD_REQUEST)
+                return Response(status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             print(f"Error: {str(e)}")
             return Response({str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
